@@ -29,7 +29,7 @@ CLASS_INFO = [
 
 
 st.set_page_config(
-    page_title="NISO Internship Project",
+    page_title="Intel Image Classification",
     page_icon="🧠",
     layout="wide",
 )
@@ -68,7 +68,7 @@ def load_model(model_name: str):
 
     custom_objects = None
     if model_name == "ResNet50":
-        from tensorflow.keras.applications.resnet50 import preprocess_input
+        from keras.applications.resnet50 import preprocess_input
 
         custom_objects = {"preprocess_input": preprocess_input}
 
@@ -134,26 +134,26 @@ render_html(
         <div class="header-card">
             <div class="topbar">
                 <div class="brand-lockup">
-                    <div class="logo-box">N</div>
+                    <div class="logo-box">AI</div>
                     <div>
-                        <div class="brand-name">NISO</div>
-                        <div class="brand-descriptor">Digital Transformation</div>
+                        <div class="brand-name">SCENE INTELLIGENCE</div>
+                        <div class="brand-descriptor">Computer Vision Workspace</div>
                     </div>
                 </div>
                 <div class="topbar-status">
                     <span class="status-dot"></span>
-                    AI workspace online
+                    Deep learning system online
                 </div>
             </div>
             <div class="header-divider"></div>
             <div class="hero-content">
                 <div class="hero-copy">
-                    <div class="hero-eyebrow">NISO · INTERNSHIP PROGRAM</div>
-                    <h1 class="app-title">NISO Internship Project</h1>
+                    <div class="hero-eyebrow">DEEP LEARNING · COMPUTER VISION</div>
+                    <h1 class="app-title">Intel Image Classification</h1>
                     
                 </div>
                 <div class="header-badges">
-                    <div class="internship-badge">Summer Internship 2026</div>
+                    <div class="internship-badge">Multi-Model Comparative Studio</div>
                     <div class="status-badge">
                         <span class="status-dot"></span>
                         Model ready
@@ -193,9 +193,9 @@ with sidebar_column:
     )
 
     selected_model = st.selectbox(
-        "Model seçin",
+        "Select Model",
         options=list(MODEL_FILES),
-        help="Tahmin için kullanılacak modeli seçin.",
+        help="Select the model to be used for prediction.",
     )
 
 
@@ -352,7 +352,7 @@ with main_column:
                 st.write("Input shape:", image_batch.shape)
 
                 if st.button("Classify Image", type="primary"):
-                    with st.spinner(f"{selected_model} görüntüyü analiz ediyor..."):
+                    with st.spinner(f"{selected_model} is analyzing the image..."):
                         probabilities = predict_image(
                             selected_model,
                             image_batch,
@@ -364,9 +364,9 @@ with main_column:
                         "probabilities": probabilities.tolist(),
                     }
             except (UnidentifiedImageError, OSError):
-                st.error("Yüklenen dosya geçerli bir JPG veya PNG görseli değil.")
+                st.error("The uploaded file is not a valid JPG or PNG image.")
             except Exception as error:
-                st.error(f"Tahmin gerçekleştirilemedi: {error}")
+                st.error(f"Prediction could not be completed: {error}")
 
             stored_prediction = st.session_state.get("prediction")
             if (
