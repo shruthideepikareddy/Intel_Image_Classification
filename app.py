@@ -122,6 +122,31 @@ def predict_image(model_name: str, image_batch: np.ndarray) -> np.ndarray:
     return probabilities / probability_sum
 
 
+def calculate_uncertainty(probabilities: np.ndarray) -> dict:
+    """
+    Trustworthy AI / OOD Novelty:
+    Calculates Shannon Entropy and Out-of-Distribution (OOD) risk metrics.
+    """
+    eps = 1e-12
+    p = np.clip(probabilities, eps, 1.0)
+    # Shannon Entropy in bits: H(p) = - sum(p * log2(p))
+    entropy = float(-np.sum(p * np.log2(p)))
+    max_entropy = float(np.log2(len(probabilities))) # log2(6) ~ 2.585 bits
+    normalized_entropy = float(entropy / max_entropy)
+    confidence = float(np.max(probabilities))
+    
+    # Margin between top-1 and top-2
+    sorted_p = np.sort(probabilities)[::-1]
+    margin = float(sorted_p[0] - sorted_p[1]) if len(sorted_p) > 1 else 1.0
+    
+    return {
+        "entropy": entropy,
+        "normalized_entropy": normalized_entropy,
+        "confidence": confidence,
+        "margin": margin,
+    }
+
+
 load_css("style.css")
 
 
@@ -197,6 +222,37 @@ with sidebar_column:
         options=list(MODEL_FILES),
         help="Select the model to be used for prediction.",
     )
+
+    # ---------------------------------------------------------
+    # Novelty: Trustworthy AI & OOD Rejection Configuration
+    # ---------------------------------------------------------
+    render_html(
+        """
+            <div class="info-card" style="margin-top: 14px;">
+                <div class="section-label">
+                    TRUSTWORTHY AI FILTER
+                </div>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.7); margin-bottom: 8px;">
+                    Out-of-Distribution (OOD) rejection threshold controls safety in open-world inference.
+                </div>
+            </div>
+        """
+    )
+
+    enable_ood_filter = st.checkbox(
+        "Enable OOD / Uncertainty Shield",
+        value=True,
+        help="Flags inputs that do not match the 6 target environment categories."
+    )
+
+    ood_confidence_threshold = st.slider(
+        "Min Confidence Threshold (%)",
+        min_value=40,
+        max_value=80,
+        value=55,
+        step=5,
+        help="Predictions below this confidence level trigger an OOD warning."
+    ) / 100.0
 
 
     try:
@@ -404,12 +460,37 @@ with main_column:
             predicted_index = int(np.argmax(current_prediction))
             predicted_icon, predicted_class = CLASS_INFO[predicted_index]
             confidence = float(current_prediction[predicted_index])
+            
+            # Trustworthy AI / OOD Metric Evaluation
+            uncertainty = calculate_uncertainty(current_prediction)
+            is_ood = enable_ood_filter and (
+                confidence < ood_confidence_threshold or uncertainty["normalized_entropy"] > 0.65
+            )
+
+            ood_warning_html = ""
+            if is_ood:
+                ood_warning_html = f"""
+                    <div class="ood-warning-box">
+                        <div class="ood-warning-icon">⚠️</div>
+                        <div>
+                            <div class="ood-warning-title">OUT-OF-DISTRIBUTION / LOW CONFIDENCE DETECTED</div>
+                            <div class="ood-warning-desc">
+                                The uploaded image has high prediction entropy ({uncertainty['normalized_entropy']:.1%}) 
+                                or confidence below safety threshold ({ood_confidence_threshold:.0%}). 
+                                It may not belong to the 6 trained natural scene categories.
+                            </div>
+                        </div>
+                    </div>
+                """
+
+            entropy_class = "is-high" if uncertainty["normalized_entropy"] > 0.60 else "is-safe"
+            margin_class = "is-high" if uncertainty["margin"] < 0.25 else "is-safe"
 
             render_html(
                 f"""
                     <div class="content-card">
                         <div class="section-label">
-                            PREDICTION RESULT
+                            PREDICTION RESULT & TRUST METRICS
                         </div>
 
                         <div class="prediction-result">
@@ -425,8 +506,25 @@ with main_column:
                             <div class="confidence-label">
                                 CONFIDENCE
                             </div>
-                            <div class="confidence-value">
+                            <div class="confidence-value" style="color: {'#d97706' if is_ood else 'var(--success)'};">
                                 {confidence:.1%}
+                            </div>
+                        </div>
+
+                        {ood_warning_html}
+
+                        <div class="trust-badge-container">
+                            <div class="trust-metric-pill">
+                                <div class="trust-metric-label">SHANNON ENTROPY</div>
+                                <div class="trust-metric-value {entropy_class}">{uncertainty['entropy']:.2f} bits</div>
+                            </div>
+                            <div class="trust-metric-pill">
+                                <div class="trust-metric-label">NORM. UNCERTAINTY</div>
+                                <div class="trust-metric-value {entropy_class}">{uncertainty['normalized_entropy']:.1%}</div>
+                            </div>
+                            <div class="trust-metric-pill">
+                                <div class="trust-metric-label">TOP-2 MARGIN</div>
+                                <div class="trust-metric-value {margin_class}">{uncertainty['margin']:.1%}</div>
                             </div>
                         </div>
                     </div>
